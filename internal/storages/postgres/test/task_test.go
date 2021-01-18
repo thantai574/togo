@@ -3,21 +3,23 @@ package test
 import (
 	"context"
 	"database/sql"
+	"github.com/google/uuid"
 	"github.com/manabie-com/togo/internal/domains/entities"
 	"github.com/manabie-com/togo/internal/storages/postgres"
 	"testing"
+	"time"
 )
 
 func TestTask(t *testing.T) {
 	db, _ := initTestDB()
 	taskDb := postgres.NewTask(db)
-	defer db.Exec("DELETE FROM task")
+	defer db.Exec("DELETE FROM tasks")
+	now := time.Now()
 	tests := []struct {
 		name     string
 		funcMock func()
 		wantErr  bool
 		want     struct {
-			insert     *entities.Task
 			countTotal int
 		}
 	}{
@@ -25,15 +27,8 @@ func TestTask(t *testing.T) {
 			name:    "insert success & get list task",
 			wantErr: false,
 			want: struct {
-				insert     *entities.Task
 				countTotal int
 			}{
-				insert: &entities.Task{
-					ID:          "T",
-					Content:     "T",
-					UserID:      "T",
-					CreatedDate: "2020-01-18",
-				},
 				countTotal: 1,
 			},
 		},
@@ -41,19 +36,19 @@ func TestTask(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := taskDb.AddTask(context.TODO(), &entities.Task{
-				ID:          "T",
+				ID:          uuid.New().String(),
 				Content:     "T",
-				UserID:      "T",
-				CreatedDate: "2020-01-18",
+				UserID:      "firstUser",
+				CreatedDate: now.Format("2006-01-02"),
 			})
 			if err != nil && tt.wantErr == false {
 				t.Errorf("Have 1 err AddTask")
 			}
 			tasks, err := taskDb.RetrieveTasks(context.TODO(), sql.NullString{
-				String: "T",
+				String: "firstUser",
 				Valid:  true,
 			}, sql.NullString{
-				String: "2020-01-18",
+				String: now.Format("2006-01-02"),
 				Valid:  true,
 			})
 			if err != nil && tt.wantErr == false {
