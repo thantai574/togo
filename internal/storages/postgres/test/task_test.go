@@ -21,7 +21,7 @@ func TestTask(t *testing.T) {
 		}
 	}{
 		{
-			name:    "insert success",
+			name:    "insert success & get list task",
 			wantErr: false,
 			want: struct {
 				insert     *entities.Task
