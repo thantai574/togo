@@ -1,6 +1,7 @@
 {
   "port": "5050",
   "env": "LIVE",
+  "jwt_key": "postgres",
   "postgres": {
     "db": "sample",
     "user_name": "postgres",

@@ -16,7 +16,7 @@ func NewTask(db *gorm.DB) *taskModel {
 }
 
 func (t *taskModel) RetrieveTasks(ctx context.Context, userID, createdDate sql.NullString) (tasks []*entities.Task, err error) {
-	cur, err := t.db.Table("task").Where("user_id = ?", userID).Where("created_date = ?", createdDate).Rows()
+	cur, err := t.db.Table("tasks").Where("user_id = ?", userID).Where("created_date = ?", createdDate).Rows()
 	if err != nil {
 		return
 	}

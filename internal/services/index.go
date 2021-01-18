@@ -68,6 +68,7 @@ func (s *ToDoService) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 }
 
 func customError(resp http.ResponseWriter, err error) {
+	resp.Header().Set("Content-Type", "application/json")
 	if e, ok := err.(errors.ErrorApplication); ok {
 		json.NewEncoder(resp).Encode(e)
 	} else {
@@ -87,6 +88,7 @@ func value(req *http.Request, p string) sql.NullString {
 }
 
 func customSuccess(resp http.ResponseWriter, data interface{}) {
+	resp.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(resp).Encode(map[string]interface{}{
 		"data": data,
 	})
@@ -97,8 +99,8 @@ func (s *ToDoService) getAuthToken(resp http.ResponseWriter, req *http.Request) 
 	u, err := s.Application.UserLogin(req.Context(), id, value(req, "password"))
 	if err != nil {
 		customError(resp, err)
+		return
 	}
-	resp.Header().Set("Content-Type", "application/json")
 	customSuccess(resp, u)
 }
 
@@ -112,8 +114,6 @@ func (s *ToDoService) listTasks(resp http.ResponseWriter, req *http.Request) {
 		},
 		value(req, "created_date"),
 	)
-
-	resp.Header().Set("Content-Type", "application/json")
 
 	if err != nil {
 		customError(resp, err)
@@ -138,8 +138,6 @@ func (s *ToDoService) addTask(resp http.ResponseWriter, req *http.Request) {
 	t.ID = uuid.New().String()
 	t.UserID = userID
 	t.CreatedDate = now.Format("2006-01-02")
-
-	resp.Header().Set("Content-Type", "application/json")
 
 	t, err = s.UserAddTask(req.Context(), t)
 
