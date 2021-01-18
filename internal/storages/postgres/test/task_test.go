@@ -2,28 +2,38 @@ package test
 
 import (
 	"context"
+	"database/sql"
 	"github.com/manabie-com/togo/internal/domains/entities"
 	"github.com/manabie-com/togo/internal/storages/postgres"
 	"testing"
 )
 
-func TestAddTask(t *testing.T) {
+func TestTask(t *testing.T) {
 	db := initTestDB()
 	taskDb := postgres.NewTask(db)
 	tests := []struct {
 		name     string
 		funcMock func()
 		wantErr  bool
-		want     *entities.Task
+		want     struct {
+			insert     *entities.Task
+			countTotal int
+		}
 	}{
 		{
 			name:    "insert success",
 			wantErr: false,
-			want: &entities.Task{
-				ID:          "T",
-				Content:     "T",
-				UserID:      "T",
-				CreatedDate: "T",
+			want: struct {
+				insert     *entities.Task
+				countTotal int
+			}{
+				insert: &entities.Task{
+					ID:          "T",
+					Content:     "T",
+					UserID:      "T",
+					CreatedDate: "2020-01-18",
+				},
+				countTotal: 1,
 			},
 		},
 	}
@@ -33,16 +43,27 @@ func TestAddTask(t *testing.T) {
 				ID:          "T",
 				Content:     "T",
 				UserID:      "T",
-				CreatedDate: "T",
+				CreatedDate: "2020-01-18",
 			})
 			if err != nil && tt.wantErr == false {
-				t.Errorf("Have 1 err ")
+				t.Errorf("Have 1 err AddTask")
 			}
+			task, err := taskDb.RetrieveTasks(context.TODO(), sql.NullString{
+				String: "T",
+				Valid:  true,
+			}, sql.NullString{
+				String: "2020-01-18",
+				Valid:  true,
+			})
+			if err != nil && tt.wantErr == false {
+				t.Errorf("Have 1 err RetrieveTasks ")
+			}
+
+			if len(task) != tt.want.countTotal {
+				t.Errorf("RetrieveTasks err ")
+			}
+
 		})
 	}
-
-}
-
-func TestGetTask(t *testing.T) {
 
 }
