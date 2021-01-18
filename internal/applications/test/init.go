@@ -15,6 +15,9 @@ type serviceTest struct {
 
 func initTest() (appTest serviceTest) {
 	conf, err := configs.LoadConfig("../../../", "config_test.json")
+	if err != nil {
+		panic(err)
+	}
 	lg, err := logger.NewLogger(conf.Env)
 	if err != nil {
 		panic(err)

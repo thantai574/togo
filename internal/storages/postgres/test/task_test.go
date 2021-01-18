@@ -9,8 +9,9 @@ import (
 )
 
 func TestTask(t *testing.T) {
-	db := initTestDB()
+	db, _ := initTestDB()
 	taskDb := postgres.NewTask(db)
+	defer db.Exec("DELETE FROM task")
 	tests := []struct {
 		name     string
 		funcMock func()
@@ -48,7 +49,7 @@ func TestTask(t *testing.T) {
 			if err != nil && tt.wantErr == false {
 				t.Errorf("Have 1 err AddTask")
 			}
-			task, err := taskDb.RetrieveTasks(context.TODO(), sql.NullString{
+			tasks, err := taskDb.RetrieveTasks(context.TODO(), sql.NullString{
 				String: "T",
 				Valid:  true,
 			}, sql.NullString{
@@ -59,7 +60,7 @@ func TestTask(t *testing.T) {
 				t.Errorf("Have 1 err RetrieveTasks ")
 			}
 
-			if len(task) != tt.want.countTotal {
+			if len(tasks) != tt.want.countTotal {
 				t.Errorf("RetrieveTasks err ")
 			}
 

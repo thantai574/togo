@@ -1,4 +1,13 @@
 {
   "port": "5050",
-  "env": "LIVE"
+  "env": "LIVE",
+  "postgres": {
+    "db": "sample",
+    "user_name": "postgres",
+    "password": "example",
+    "ssl_mode": "disable",
+    "port": "5432",
+    "addr": "localhost",
+    "time_zone": "Asia/Ho_Chi_Minh"
+  }
 }

@@ -1,12 +1,12 @@
 package test
 
 import (
-	"github.com/go-pg/pg/v10"
 	"github.com/manabie-com/togo/internal/storages/postgres"
 	"github.com/manabie-com/togo/internal/utils/configs"
+	"gorm.io/gorm"
 )
 
-func initTestDB() *pg.DB {
+func initTestDB() (*gorm.DB, error) {
 	conf, err := configs.LoadConfig("../../../../", "config_test.json")
 	if err != nil {
 		panic(err)

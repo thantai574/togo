@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/manabie-com/togo/internal/applications"
+	"github.com/manabie-com/togo/internal/storages/postgres"
 	"github.com/manabie-com/togo/internal/utils/configs"
 	"github.com/manabie-com/togo/internal/utils/logger"
 	"net/http"
@@ -23,10 +24,13 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
-	s.Application = applications.Application{}.
+	app := &applications.Application{}
+	db, _ := postgres.NewDB(conf)
+	s.Application = app.
 		WithConfig(conf).
-		WithLogger(lg).Build()
+		WithLogger(lg).
+		WithTaskStorage(postgres.NewTask(db)).
+		WithUserStorage(postgres.NewUserModel(db)).Build()
 
 	http.ListenAndServe(":5050", s)
 }
