@@ -4,20 +4,25 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"github.com/manabie-com/togo/internal/applications"
+	"github.com/manabie-com/togo/internal/domains/entities"
+	"github.com/manabie-com/togo/internal/errors"
+	"github.com/manabie-com/togo/internal/utils/configs"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"log"
 	"net/http"
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/google/uuid"
-	"github.com/manabie-com/togo/internal/storages"
-	sqllite "github.com/manabie-com/togo/internal/storages/sqlite"
 )
 
 // ToDoService implement HTTP server
 type ToDoService struct {
-	JWTKey string
-	Store  *sqllite.LiteDB
+	Logger *zap.Logger
+	Config *configs.Config
+	*applications.Application
 }
 
 func (s *ToDoService) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
@@ -26,6 +31,15 @@ func (s *ToDoService) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	resp.Header().Set("Access-Control-Allow-Headers", "*")
 	resp.Header().Set("Access-Control-Allow-Methods", "*")
 
+	defer func() {
+		if r := recover(); r != nil {
+			s.Logger.With(zapcore.Field{
+				Key:       "recovery_data",
+				Type:      zapcore.ReflectType,
+				Interface: r,
+			}).Info("recovery panic ")
+		}
+	}()
 	if req.Method == http.MethodOptions {
 		resp.WriteHeader(http.StatusOK)
 		return
@@ -53,34 +67,44 @@ func (s *ToDoService) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	}
 }
 
+func customError(resp http.ResponseWriter, err error) {
+	if e, ok := err.(errors.ErrorApplication); ok {
+		json.NewEncoder(resp).Encode(e)
+	} else {
+		json.NewEncoder(resp).Encode(errors.ErrorApplication{
+			Code:        400,
+			InternalMsg: err.Error(),
+			ExternalMsg: err.Error(),
+		})
+	}
+}
+
+func value(req *http.Request, p string) sql.NullString {
+	return sql.NullString{
+		String: req.FormValue(p),
+		Valid:  true,
+	}
+}
+
+func customSuccess(resp http.ResponseWriter, data interface{}) {
+	json.NewEncoder(resp).Encode(map[string]interface{}{
+		"data": data,
+	})
+}
+
 func (s *ToDoService) getAuthToken(resp http.ResponseWriter, req *http.Request) {
 	id := value(req, "user_id")
-	if !s.Store.ValidateUser(req.Context(), id, value(req, "password")) {
-		resp.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(resp).Encode(map[string]string{
-			"error": "incorrect user_id/pwd",
-		})
-		return
+	u, err := s.Application.UserLogin(req.Context(), id, value(req, "password"))
+	if err != nil {
+		customError(resp, err)
 	}
 	resp.Header().Set("Content-Type", "application/json")
-
-	token, err := s.createToken(id.String)
-	if err != nil {
-		resp.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(resp).Encode(map[string]string{
-			"error": err.Error(),
-		})
-		return
-	}
-
-	json.NewEncoder(resp).Encode(map[string]string{
-		"data": token,
-	})
+	customSuccess(resp, u)
 }
 
 func (s *ToDoService) listTasks(resp http.ResponseWriter, req *http.Request) {
 	id, _ := userIDFromCtx(req.Context())
-	tasks, err := s.Store.RetrieveTasks(
+	tasks, err := s.Application.UserGetTasks(
 		req.Context(),
 		sql.NullString{
 			String: id,
@@ -92,24 +116,20 @@ func (s *ToDoService) listTasks(resp http.ResponseWriter, req *http.Request) {
 	resp.Header().Set("Content-Type", "application/json")
 
 	if err != nil {
-		resp.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(resp).Encode(map[string]string{
-			"error": err.Error(),
-		})
+		customError(resp, err)
 		return
 	}
 
-	json.NewEncoder(resp).Encode(map[string][]*storages.Task{
-		"data": tasks,
-	})
+	customSuccess(resp, tasks)
 }
 
 func (s *ToDoService) addTask(resp http.ResponseWriter, req *http.Request) {
-	t := &storages.Task{}
+	t := &entities.Task{}
 	err := json.NewDecoder(req.Body).Decode(t)
 	defer req.Body.Close()
+
 	if err != nil {
-		resp.WriteHeader(http.StatusInternalServerError)
+		customError(resp, err)
 		return
 	}
 
@@ -121,37 +141,14 @@ func (s *ToDoService) addTask(resp http.ResponseWriter, req *http.Request) {
 
 	resp.Header().Set("Content-Type", "application/json")
 
-	err = s.Store.AddTask(req.Context(), t)
+	t, err = s.UserAddTask(req.Context(), t)
+
 	if err != nil {
-		resp.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(resp).Encode(map[string]string{
-			"error": err.Error(),
-		})
+		customError(resp, err)
 		return
 	}
 
-	json.NewEncoder(resp).Encode(map[string]*storages.Task{
-		"data": t,
-	})
-}
-
-func value(req *http.Request, p string) sql.NullString {
-	return sql.NullString{
-		String: req.FormValue(p),
-		Valid:  true,
-	}
-}
-
-func (s *ToDoService) createToken(id string) (string, error) {
-	atClaims := jwt.MapClaims{}
-	atClaims["user_id"] = id
-	atClaims["exp"] = time.Now().Add(time.Minute * 15).Unix()
-	at := jwt.NewWithClaims(jwt.SigningMethodHS256, atClaims)
-	token, err := at.SignedString([]byte(s.JWTKey))
-	if err != nil {
-		return "", err
-	}
-	return token, nil
+	customSuccess(resp, t)
 }
 
 func (s *ToDoService) validToken(req *http.Request) (*http.Request, bool) {
@@ -159,7 +156,7 @@ func (s *ToDoService) validToken(req *http.Request) (*http.Request, bool) {
 
 	claims := make(jwt.MapClaims)
 	t, err := jwt.ParseWithClaims(token, claims, func(*jwt.Token) (interface{}, error) {
-		return []byte(s.JWTKey), nil
+		return []byte(s.Config.JwtKey), nil
 	})
 	if err != nil {
 		log.Println(err)

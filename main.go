@@ -1,26 +1,32 @@
 package main
 
 import (
-	"database/sql"
-	"log"
+	"github.com/manabie-com/togo/internal/applications"
+	"github.com/manabie-com/togo/internal/utils/configs"
+	"github.com/manabie-com/togo/internal/utils/logger"
 	"net/http"
 
 	"github.com/manabie-com/togo/internal/services"
-	sqllite "github.com/manabie-com/togo/internal/storages/sqlite"
-
 	_ "github.com/mattn/go-sqlite3"
 )
 
 func main() {
-	db, err := sql.Open("sqlite3", "./data.db")
+	s := &services.ToDoService{}
+
+	conf, err := configs.LoadConfig("./", "config.json")
 	if err != nil {
-		log.Fatal("error opening db", err)
+		panic(err)
+	}
+	s.Config = conf
+
+	lg, err := logger.NewLogger(conf.Env)
+	if err != nil {
+		panic(err)
 	}
 
-	http.ListenAndServe(":5050", &services.ToDoService{
-		JWTKey: "wqGyEBBfPK9w3Lxw",
-		Store: &sqllite.LiteDB{
-			DB: db,
-		},
-	})
+	s.Application = applications.Application{}.
+		WithConfig(conf).
+		WithLogger(lg).Build()
+
+	http.ListenAndServe(":5050", s)
 }
